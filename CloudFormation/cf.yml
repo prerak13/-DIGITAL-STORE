@@ -1,0 +1,582 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: This template creates vpc with public and private subnets
+
+# The following metadata is used to group the parameters
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "EC2 Keys"
+        Parameters:
+          - PublicEC2Key
+          - PrivateEC2Key
+      - Label:
+          default: DBAllocatedStorage
+        Parameters:
+          - DBAllocatedStorage
+      - Label:
+          default: "VPC CIDR"
+        Parameters:
+          - VpcCIDR
+      - Label:
+          default: "Subnet CIDR"
+        Parameters:
+          - PublicSubnet1CIDR
+          - PublicSubnet2CIDR
+          - PrivateSubnet1CIDR
+          - PrivateSubnet2CIDR
+          - PrivateSubnet3CIDR
+
+# Parameters are used to to build flexible CloudFormation templates
+Parameters:
+  DBAllocatedStorage:
+    Default: "50"
+    Description: The size of the database (GiB)
+    Type: Number
+    MinValue: "20"
+    MaxValue: "65536"
+    ConstraintDescription: must be between 20 and 65536 GiB.
+
+  PublicEC2Key:
+    Default: NEW_KEY
+    Description: Please enter keyname for ec2 public and Beanstalk
+    Type: String
+
+  PublicEBSKey:
+    Default: NEW_KEY
+    Description: Please enter keyname for Public EBSKey
+    Type: String
+
+  PrivateEC2Key:
+    Default: NEW_KEY
+    Description: Please enter keyname for ec2 private
+    Type: String
+
+  VpcCIDR:
+    Default: 10.0.0.0/16
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+
+  PrivateSubnet1CIDR:
+    Default: 10.0.0.0/24
+    Description: Please enter the IP range (CIDR notation) for the private subnet 1
+    Type: String
+
+  PrivateSubnet2CIDR:
+    Default: 10.0.1.0/24
+    Description: Please enter the IP range (CIDR notation) for the private subnet 2
+    Type: String
+  PrivateSubnet3CIDR:
+    Default: 10.0.2.0/24
+    Description: Please enter the IP range (CIDR notation) for the private subnet 3
+    Type: String
+  PublicSubnet1CIDR:
+    Default: 10.0.3.0/24
+    Description: Please enter the IP range (CIDR notation) for the public subnet 1
+    Type: String
+
+  PublicSubnet2CIDR:
+    Default: 10.0.4.0/24
+    Description: Please enter the IP range (CIDR notation) for the public subnet 1
+    Type: String
+
+Resources:
+  # Create VPC
+  VPCCF:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: VPCCF
+
+  # Create Internet Gateway
+  IGWCF:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: IGWCF
+
+  # Attach Internet Gateway to VPC
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref IGWCF
+      VpcId: !Ref VPCCF
+
+  ## Creation of private subnet 1,2 and 3
+  # Create Private Subnet1
+  PrivateSubnet1CF:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: Private Subnet 1
+      VpcId: !Ref VPCCF
+  # Create Private Subnet2
+  PrivateSubnet2CF:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: Private Subnet 2
+      VpcId: !Ref VPCCF
+  # Create Private Subnet3
+  PrivateSubnet3CF:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [2, !GetAZs ""]
+      CidrBlock: !Ref PrivateSubnet3CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: Private Subnet 3
+      VpcId: !Ref VPCCF
+  ## Creation of private subnet 1,2 and 3 ends
+
+  # Create Public Subnet1 Start
+  PublicSubnet1CF:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: Public Subnet 1
+      VpcId: !Ref VPCCF
+
+  # Create Public Subnet1 Ends
+
+  # Create Public Subnet2 Start
+  PublicSubnet2CF:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: Public Subnet 2
+      VpcId: !Ref VPCCF
+
+  # Create Public Subnet2 Ends
+
+  # Create PUBLIC Route Table START
+  PublicRouteTableCF:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: PublicRouteTableCF
+      VpcId: !Ref VPCCF
+  # Create PUBLIC Route Table END
+
+  ## Create PRIVATE Route Tables Start
+  #Private Route Table1
+  PrivateRouteTable1CF:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: PrivateRouteTable1CF
+      VpcId: !Ref VPCCF
+  #Private Route Table2
+  PrivateRouteTable2CF:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: PrivateRouteTable2CF
+      VpcId: !Ref VPCCF
+  #Private Route Table3
+  PrivateRouteTable3CF:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: PrivateRouteTable3CF
+      VpcId: !Ref VPCCF
+  ##Private Route Table Creation Ends
+
+  # Create Elastic ip start
+  ElasticIpCF:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: ElasticIPCF
+
+  # Create Elastic ip ends
+
+  # Create NAT GATEWAY
+  NatGatewayCF:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      ConnectivityType: public
+      AllocationId: !GetAtt ElasticIpCF.AllocationId
+      SubnetId: !Ref PublicSubnet1CF
+
+  #Creation of NAT GATEWAY ends
+
+  ##Associate NAT to private subnets
+  # ADD NAT TO PRIVATE ROUTE 1 TABLE START
+  RouteNatGatewayToPrivateRouteTable1CF:
+    Type: AWS::EC2::Route
+    DependsOn: [NatGatewayCF]
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref NatGatewayCF
+      RouteTableId: !Ref PrivateRouteTable1CF
+  # ADD NAT TO PRIVATE ROUTE 1 TABLE END
+  # ADD NAT TO PRIVATE ROUTE 2 TABLE START
+  RouteNatGatewayToPrivateRouteTable2CF:
+    Type: AWS::EC2::Route
+    DependsOn: [NatGatewayCF]
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref NatGatewayCF
+      RouteTableId: !Ref PrivateRouteTable2CF
+  # ADD NAT TO PRIVATE ROUTE 2 TABLE END
+  # ADD NAT TO PRIVATE ROUTE 3 TABLE START
+  RouteNatGatewayToPrivateRouteTable3CF:
+    Type: AWS::EC2::Route
+    DependsOn: [NatGatewayCF]
+    Properties:
+      DestinationCidrBlock: "0.0.0.0/0"
+      NatGatewayId: !Ref NatGatewayCF
+      RouteTableId: !Ref PrivateRouteTable3CF
+  # ADD NAT TO PRIVATE ROUTE 3 TABLE END
+
+  # Associate private Subnet1,2,3 with private Route Table1,2,3
+  PrivateSubnet1NATAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1CF
+      SubnetId: !Ref PrivateSubnet1CF
+
+  PrivateSubnet2NATAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2CF
+      SubnetId: !Ref PrivateSubnet2CF
+  PrivateSubnet3NATAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable3CF
+      SubnetId: !Ref PrivateSubnet3CF
+  ##Associate NAT to private subnets end
+
+  # Add IGW to public route
+  PublicRouteCF:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref IGWCF
+      RouteTableId: !Ref PublicRouteTableCF
+
+  # Associate Public Subnet1 with Public Route Table
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTableCF
+      SubnetId: !Ref PublicSubnet1CF
+
+  # Associate Public Subnet2 with Public Route Table
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTableCF
+      SubnetId: !Ref PublicSubnet2CF
+
+  #Security group for public ec2 start
+  PublicEC2SGCF:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPCCF
+      GroupDescription: "Allow SSH and HTTP traffic"
+      SecurityGroupIngress:
+        - IpProtocol: tcp #HTTP
+          FromPort: 80
+          CidrIp: 0.0.0.0/0
+          ToPort: 80
+        - IpProtocol: tcp #HTTPS
+          FromPort: 443
+          CidrIp: 0.0.0.0/0
+          ToPort: 443
+        - IpProtocol: tcp #CUSTOM
+          FromPort: 3000
+          CidrIp: 0.0.0.0/0
+          ToPort: 3000
+        - IpProtocol: tcp #CUSTOM
+          FromPort: 8080
+          CidrIp: 0.0.0.0/0
+          ToPort: 8080
+        - IpProtocol: tcp #SSH
+          CidrIp: 0.0.0.0/0
+          FromPort: 22
+          ToPort: 22
+  #Security group for public ec2 end
+
+  #Security group for ebs start
+  PublicEbsSGCF:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPCCF
+      GroupDescription: "Allow SSH and HTTP traffic"
+      SecurityGroupIngress:
+        - IpProtocol: tcp #HTTP
+          FromPort: 80
+          CidrIp: 0.0.0.0/0
+          ToPort: 80
+        - IpProtocol: tcp #HTTPS
+          FromPort: 443
+          CidrIp: 0.0.0.0/0
+          ToPort: 443
+        - IpProtocol: tcp #CUSTOM
+          FromPort: 3000
+          CidrIp: 0.0.0.0/0
+          ToPort: 3000
+        - IpProtocol: tcp #CUSTOM
+          FromPort: 8080
+          CidrIp: 0.0.0.0/0
+          ToPort: 8080
+        - IpProtocol: tcp #SSH
+          CidrIp: 0.0.0.0/0
+          FromPort: 22
+          ToPort: 22
+  #Security group for ebs end
+
+  #Security group for private ec2 start at subnet 1
+  PrivateEC2SGCF:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPCCF
+      GroupDescription: "Allow SSH and HTTP traffic from PublicEC2SGCF security group only"
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref PublicEC2SGCF
+          IpProtocol: tcp #SSH REQUESTS
+          FromPort: 22
+          ToPort: 22
+
+        - SourceSecurityGroupId: !Ref PublicEC2SGCF
+          IpProtocol: tcp #HTTP REQUESTS
+          FromPort: 80
+          ToPort: 80
+
+        - SourceSecurityGroupId: !Ref PublicEC2SGCF
+          IpProtocol: tcp #HTTPS REQUESTS
+          FromPort: 443
+          ToPort: 443
+
+        - SourceSecurityGroupId: !Ref PublicEC2SGCF
+          IpProtocol: tcp #CUSTOM REQUESTS
+          FromPort: 8080
+          ToPort: 8080
+
+  #SUBNET GROUP of private subnet 2 and 3 start
+  SubnetGroup1CF:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet Group for clubbing rds subnets (private subnet 2 and 3)
+      DBSubnetGroupName: SubnetGroup1CF
+      SubnetIds:
+        - !Ref PrivateSubnet2CF
+        - !Ref PrivateSubnet3CF
+      Tags:
+        - Key: Name
+          Value: SubnetGroup1CF
+  #SUBNET GROUP of private subnet 2 and 3 ends
+
+  #Security group for rds starts
+  PrivateRDSSGCF:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPCCF
+      GroupDescription: "Allow sql request from private subnet 1 security group only"
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !Ref PrivateEC2SGCF
+          IpProtocol: TCP #Sql arora REQUESTS
+          FromPort: 3306
+          ToPort: 3306
+
+  #Security group for rds ends
+
+  #Creating RDS starts
+  RDSSQLCF:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: !Ref DBAllocatedStorage
+
+      DBInstanceClass: db.t2.small
+      DBName: db1
+      DBSubnetGroupName: !Ref SubnetGroup1CF
+      Engine: mysql
+      EngineVersion: "8.0.27"
+      MasterUsername: admin
+      MasterUserPassword: cloudeagles
+      Port: 3306
+      Tags:
+        - Key: Name
+          Value: RDSSQLCF
+      VPCSecurityGroups:
+        - !Ref PrivateRDSSGCF
+
+  #Creating RDS ends
+
+  # Creating EC2 Public Subnet Begins
+  PublicEC2InstanceCF:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId: ami-0c02fb55956c7d316
+      SubnetId: !Ref PublicSubnet1CF
+      KeyName: !Ref PublicEC2Key
+      SecurityGroupIds:
+        - !Ref PublicEC2SGCF
+  # EC2 Ends
+
+  # Creating EBS Public Begins
+
+  # Elastic Beanstalk Begins
+  ElasticBeanStalkApplicationCF:
+    Type: AWS::ElasticBeanstalk::Application
+    Properties:
+      Description: App for groceries
+  #APPLICATION
+  ElasticBeanStalkApplicationVersionCF:
+    Type: AWS::ElasticBeanstalk::ApplicationVersion
+    Properties:
+      ApplicationName:
+        Ref: ElasticBeanStalkApplicationCF
+      Description: App for groceries
+      SourceBundle:
+        S3Bucket: application
+        S3Key: app.zip
+
+  BeanStalkConfigurationTemplate:
+    Type: AWS::ElasticBeanstalk::ConfigurationTemplate
+    Properties:
+      ApplicationName:
+        Ref: ElasticBeanStalkApplicationCF
+      SolutionStackName: "cf solution"
+      OptionSettings:
+        - Namespace: aws:autoscaling:asg
+          OptionName: MinSize
+          Value: "2"
+
+        - Namespace: aws:autoscaling:asg
+          OptionName: MaxSize
+          Value: "5"
+
+        - Namespace: aws:elasticbeanstalk:environment
+          OptionName: EnvironmentType
+          Value: LoadBalanced
+
+        - Namespace: aws:ec2:vpc
+          OptionName: VPCId
+          Value: !Ref VPCCF
+
+        - Namespace: aws:ec2:vpc
+          OptionName: Subnets
+          Value: !Ref PublicSubnet2CF
+
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: IamInstanceProfile
+          Value: LabInstanceProfile
+
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: EC2KeyName
+          Value: !Ref PublicEC2Key
+
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: InstanceType
+          Value: t2.medium
+
+        - Namespace: aws:autoscaling:launchconfiguration
+          OptionName: SecurityGroups
+          Value: !Ref PublicEbsSGCF
+
+  DevEnvironment:
+    Type: AWS::ElasticBeanstalk::Environment
+    Properties:
+      ApplicationName: !Ref ElasticBeanStalkApplicationCF
+      Description: test
+      TemplateName: !Ref: BeanStalkConfigurationTemplate
+      VersionLabel: !Ref: ElasticBeanStalkApplicationVersionCF
+  # Elastic Beanstalk Ends
+
+  # Creating EC2 Public Ends
+
+  # Creating EC2 Private Subnet Begins
+  PrivateEC2InstanceCF:
+    Type: AWS::EC2::Instance
+    Properties:
+      KeyName: !Ref PrivateEC2Key
+      InstanceType: t2.micro
+      ImageId: ami-0c02fb55956c7d316
+      SubnetId: !Ref PrivateSubnet1CF
+      SecurityGroupIds:
+        - !Ref PrivateEC2SGCF
+  # EC2 Ends
+
+Outputs:
+  # Export VPC ID
+  VPCCF:
+    Description: VPC ID
+    Export:
+      Name: !Sub ${AWS::StackName}-VPCCF
+    Value: !Ref VPCCF
+
+  # Export Public Subnet 1
+  PublicSubnet1CF:
+    Description: Public Subnet 1 ID
+    Export:
+      Name: !Sub ${AWS::StackName}-PublicSubnet1CF
+    Value: !Ref PublicSubnet1CF
+
+  # Export Private Subnet 1
+  PrivateSubnet1CF:
+    Description: Private Subnet 1 ID
+    Export:
+      Name: !Sub ${AWS::StackName}-PrivateSubnet1CF
+    Value: !Ref PrivateSubnet1CF
+
+    # Export Private Subnet 2
+  PrivateSubnet2CF:
+    Description: Private Subnet 2 ID
+    Export:
+      Name: !Sub ${AWS::StackName}-PrivateSubnet2CF
+    Value: !Ref PrivateSubnet2CF
+
+  # Export  Security Group public ec2
+  PublicEC2SGCF:
+    Description: EC2 public sg
+    Export:
+      Name: !Sub ${AWS::StackName}-PublicEC2SGCF
+    Value: !Ref PublicEC2SGCF
+
+  # Export Security Group private ec2
+  PrivateEC2SGCF:
+    Description: EC2 private sg
+    Export:
+      Name: !Sub ${AWS::StackName}-PrivateEC2SGCF
+    Value: !Ref PrivateEC2SGCF
+  # Export Security Group rds
+  PrivateRDSSGCF:
+    Description: rds private sg
+    Export:
+      Name: !Sub ${AWS::StackName}-PrivateRDSSGCF
+    Value: !Ref PrivateRDSSGCF
